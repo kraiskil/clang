@@ -5644,13 +5644,17 @@ validateAsmConstraint(const char *&Name,
       return TargetInfo::VoidPtrBuiltinVaList;
     }
     void getGCCRegNames(const char * const *&Names,
-                        unsigned &NumNames) const override {}
+                        unsigned &NumNames) const override {
+      NumNames=0;
+    }
     bool validateAsmConstraint(const char *&Name,
                                TargetInfo::ConstraintInfo &info) const override{
       return true;
     }
     void getGCCRegAliases(const GCCRegAlias *&Aliases,
-                          unsigned &NumAliases) const override {}
+                          unsigned &NumAliases) const override {
+      NumAliases=0;
+    }
   };
 
 class MipsTargetInfoBase : public TargetInfo {
