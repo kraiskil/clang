@@ -1840,6 +1840,7 @@ void CodeGenFunction::EmitAsmStmt(const AsmStmt &S) {
   std::string InOutConstraints;
   std::vector<llvm::Value*> InOutArgs;
   std::vector<llvm::Type*> InOutArgTypes;
+  bool IsReadNone=true;
 
   for (unsigned i = 0, e = S.getNumOutputs(); i != e; i++) {
     TargetInfo::ConstraintInfo &Info = OutputConstraintInfos[i];
@@ -2014,6 +2015,8 @@ void CodeGenFunction::EmitAsmStmt(const AsmStmt &S) {
 
     if (Clobber != "memory" && Clobber != "cc")
       Clobber = getTarget().getNormalizedGCCRegisterName(Clobber);
+    else
+      IsReadNone=false;
 
     if (!Constraints.empty())
       Constraints += ',';
@@ -2026,6 +2029,9 @@ void CodeGenFunction::EmitAsmStmt(const AsmStmt &S) {
   // Add machine specific clobbers
   std::string MachineClobbers = getTarget().getClobbers();
   if (!MachineClobbers.empty()) {
+    // TODO: actually ask the target about its added clobbers...
+    IsReadNone=false;
+
     if (!Constraints.empty())
       Constraints += ',';
     Constraints += MachineClobbers;
@@ -2051,6 +2057,22 @@ void CodeGenFunction::EmitAsmStmt(const AsmStmt &S) {
   llvm::CallInst *Result = Builder.CreateCall(IA, Args);
   Result->addAttribute(llvm::AttributeSet::FunctionIndex,
                        llvm::Attribute::NoUnwind);
+
+  // TODO: as the constraints are target specific (see getClobbers call above),
+  // we should consult the target wether or not the asm statement is a readnone
+  // or not. The most interesting one is the "memory" clobber anyway, with
+  // which the programmer marks explicit memory modification, and which is 
+  // target independent.
+  for (unsigned i = 0, e = ArgTypes.size(); i != e; i++) {
+    if (isa<llvm::PointerType>(ArgTypes[i])) {
+      IsReadNone=false;
+        break;
+    }
+  }
+  if (IsReadNone)
+    Result->addAttribute(llvm::AttributeSet::FunctionIndex,
+                         llvm::Attribute::ReadNone);
+  
 
   // Slap the source location of the inline asm into a !srcloc metadata on the
   // call.
